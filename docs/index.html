@@ -1,0 +1,211 @@
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="cache-control" content="max-age=0"/>
+        <meta http-equiv="cache-control" content="no-cache" />
+        <meta http-equiv="expires" content="0" />
+        <meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT"/>
+        <meta http-equiv="pragma" content="no-cache" />
+        <meta name="viewport" content="width=350">
+
+        <style>
+            html, body {
+                margin: 0;
+            }
+            #main {
+                margin: 0;
+                border-collapse: separate;
+                border-spacing: 1;
+            }
+
+            #main td {
+                width: 10px;
+                height: 10px;
+                border: solid 1px #ffffff;
+                border-radius: 5px;
+            }
+
+            #main td.snake-head {
+                border: solid 1px #007700;
+                background-color: #007700;
+            }
+
+            #main td.snake-body {
+                border: solid 1px #00aa00;
+                background-color: #00aa00;
+            }
+
+            #main td.snake-head.crash {
+                border: solid 1px #770000;
+                background-color: #770000;
+            }
+
+            #main td.snake-body.crash {
+                border: solid 1px #aa0000;
+                background-color: #aa0000;
+            }
+            
+        </style>
+        <script>
+            document.addEventListener('DOMContentLoaded', function(){
+                const board = (() => { 
+                    const table = document.getElementById("main");
+
+                    // cleaning
+                    while (table.rows.length > 0) {
+                        table.deleteRow(-1);
+                    }
+
+                    // initalizing the table
+                    const cellSize = 10;
+
+                    const xCount = Math.floor(window.innerWidth / (cellSize + 1));
+                    const yCount = Math.floor(window.innerHeight / (cellSize + 1));
+
+                    for(let y = 0; y < yCount; y++)
+                    {
+                        const row = table.insertRow(y);
+
+                        for(let x = 0; x < xCount; x++)
+                        {
+                            const cell = row.insertCell(x);
+                        }
+                    }
+
+                    return {
+                        width: () => table.rows[0].cells.length,
+                        height: () => table.rows.length,
+
+                        drawSnake: (snake, {clearLast, crash}) => {
+                            for(let i = 0; i < snake.length; i++) {
+                                const classList = table.rows[snake[i].y].cells[snake[i].x].classList;
+                                if (i === 0) {
+                                    classList.remove('snake-body', 'crash');
+                                    classList.add('snake-head');
+                                    if (crash) { 
+                                        classList.add('crash'); 
+                                    }
+                                } else if (i < snake.length - 1 || !clearLast) {
+                                    classList.remove('snake-head', 'crash');
+                                    classList.add('snake-body');
+                                    if (crash) { 
+                                        classList.add('crash'); 
+                                    }
+                                } else {
+                                    classList.remove('snake-body', 'snake-head', 'crash');
+                                }
+                            }
+                        }
+                    };
+                })();
+
+                function createRandomPoint() {
+                    return {
+                        x: Math.floor(Math.random() * board.width()),
+                        y: Math.floor(Math.random() * board.height())
+                    };
+                }
+
+                function createPoint({x, y}, {deltaX, deltaY}) {
+                    return {
+                        x: x + deltaX,
+                        y: y + deltaY,
+                    }
+                }
+
+                const delta = {
+                    deltaX: 0,
+                    deltaY: 0,
+                };
+
+                window.onkeydown = (e) => {
+                    switch ((e || window.event).keyCode)  {
+                        case 38: // up
+                            delta.deltaX = 0;
+                            delta.deltaY = -1;
+                            break;
+
+                        case 40: // down
+                            delta.deltaX = 0;
+                            delta.deltaY = 1;
+                            break;
+
+                        case 37: // left
+                            delta.deltaX = -1;
+                            delta.deltaY = 0;
+                            break;
+
+                        case 39: // right
+                            delta.deltaX = 1;
+                            delta.deltaY = 0;
+                            break;
+                    }
+                };
+
+                const snake = ((size) => {
+                    const snake = [createRandomPoint()];
+                    const preferX = Math.random() >= 0.5;
+                    const delta = {
+                        deltaX:  preferX ? Math.random() >= 0.5 ? 1 : -1 : 0,
+                        deltaY: !preferX ? Math.random() >= 0.5 ? 1 : -1 : 0,
+                    };
+                    for(let i = 1; i < size; i++) {
+                        const last = snake[snake.length - 1];
+                        if (last.x + delta.deltaX < 0 || last.x + delta.deltaX >= board.width()) {
+                            delta.deltaX = 0;
+                            delta.deltaY = 
+                                last.y === 0 ? 1 : 
+                                last.y === board.height() - 1 ? -1 :
+                                    Math.random() >= 0.5 ? 1 : -1;
+                        }
+
+                        if (last.y + delta.deltaY < 0 || last.y + delta.deltaY >= board.height()) {
+                            delta.deltaX = 
+                                last.x === 0 ? 1 : 
+                                last.x === board.width() - 1 ? -1 :
+                                    Math.random() >= 0.5 ? 1 : -1;
+                            delta.deltaY = 0;
+                        }
+
+                        snake.push(createPoint(last, delta));
+                    }
+
+                    board.drawSnake(snake, { clearLast: false });
+                    return snake;
+                })(3);
+
+                function onTimer() {
+                    if (delta.deltaX === 0 && delta.deltaY ===0) {
+                        window.setTimeout(onTimer, 1000);
+                        return;
+                    }
+
+                    const newHead = createPoint(snake[0], delta);
+                    if (newHead.x < 0 || 
+                        newHead.x >= board.width() ||
+                        newHead.y < 0 ||
+                        newHead.y >= board.height()
+                        )
+                    {
+                        console.info('crash');
+                        board.drawSnake(snake, { crash: true });
+                        // don't continue timer
+                        return;
+                    }
+
+                    snake.unshift(newHead);
+                    board.drawSnake(snake, { clearLast: true });
+                    snake.pop();
+
+                    window.setTimeout(onTimer, 1000);
+                }
+
+                window.setTimeout(onTimer, 1000);
+
+            }, false);
+        </script>
+    </head>
+    <body>
+        <table id="main"></table>
+    </body>
+</html>
